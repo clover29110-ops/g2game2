@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖書館小勇士 - 100分大挑戰 (對戰電腦版)</title>
+    <!-- 引入 Tailwind CSS 樣式庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 執行環境 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel 翻譯器 -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 selection:bg-sky-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 內建圖示元件
+        const Trophy = ({ className }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+        );
+        const Dices = ({ className }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="12" height="12" x="2" y="10" rx="2" ry="2"></rect><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"></path><path d="M6 18h.01"></path><path d="M10 14h.01"></path><path d="M15 6h.01"></path><path d="M18 9h.01"></path></svg>
+        );
+        const Star = ({ className }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        );
+        const BookIcon = (props) => (
+            <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
+        );
+
+        // --- 遊戲資料庫 ---
+        const MNEMONICS = {
+          '000': '0呀0，林林總總是總類',
+          '100': '1呀1，一思一想是哲學',
+          '200': '2呀2，阿彌陀佛是宗教',
+          '300': '3呀3，山明水秀真自然',
+          '400': '4呀4，實際應用妙科學',
+          '500': '5呀5，五光十色是社會',
+          '600': '6呀6，六朝古都在中國',
+          '700': '7呀7，七大奇景世界遊',
+          '800': '8呀8，八仙過海說故事',
+          '900': '9呀9，音樂美術最長久'
+        };
+
+        const CAT_ICONS = {
+          '000': '📚', '100': '🤔', '200': '🕊️', '300': '🦖', '400': '💻', 
+          '500': '👮', '600': '🐉', '700': '🌍', '800': '📖', '900': '🎨',
+          'helper': '🌟', 'confused': '😵', 'challenge': '❓', 'start': '🚩'
+        };
+
+        const CAT_COLORS = {
+          '000': 'bg-slate-50 border-slate-300 text-slate-700',
+          '100': 'bg-purple-50 border-purple-300 text-purple-700',
+          '200': 'bg-yellow-50 border-yellow-300 text-yellow-800',
+          '300': 'bg-green-50 border-green-300 text-green-800',
+          '400': 'bg-orange-50 border-orange-300 text-orange-800',
+          '500': 'bg-red-50 border-red-300 text-red-800',
+          '600': 'bg-rose-50 border-rose-300 text-rose-800',
+          '700': 'bg-blue-50 border-blue-300 text-blue-800',
+          '800': 'bg-pink-50 border-pink-300 text-pink-800',
+          '900': 'bg-indigo-50 border-indigo-300 text-indigo-800'
+        };
+
+        const CATEGORY_QUESTIONS = {
+          '000': [
+            { q: '想查不懂的字，請問《小學生字典》要放在哪一區？', opts: ['(A) 000 總類', '(B) 800 語文類'], ans: 0 },
+            { q: '大家喜歡的小百科會放在哪一區？', opts: ['(A) 000 總類', '(B) 300 自然科學'], ans: 0 },
+            { q: '《十萬個為什麼》百科全書應該在哪一類？', opts: ['(A) 000 總類', '(B) 300 自然科學'], ans: 0 },
+          ],
+          '100': [
+            { q: '教我們懂禮貌、學會控制情緒的書在哪一區？', opts: ['(A) 100 哲學類', '(B) 800 語文類'], ans: 0 },
+            { q: '《想念的感覺》這本談論心理與情感的繪本在哪一類？', opts: ['(A) 100 哲學類', '(B) 900 藝術類'], ans: 0 },
+            { q: '探討「人為什麼會生氣？」的書籍放在哪裡？', opts: ['(A) 300 自然科學', '(B) 100 哲學類'], ans: 1 },
+          ],
+          '200': [
+            { q: '《希臘羅馬神話》屬於哪一個分類號？', opts: ['(A) 200 宗教類', '(B) 800 語文類'], ans: 0 },
+            { q: '介紹「佛教」與「基督教」的書在哪一類？', opts: ['(A) 200 宗教類', '(B) 500 社會科學'], ans: 0 },
+            { q: '《媽祖林默娘》的神明故事書會放在哪裡？', opts: ['(A) 600 中國史地', '(B) 200 宗教類'], ans: 1 },
+          ],
+          '300': [
+            { q: '介紹「暴龍與三角龍」的書在哪裡？', opts: ['(A) 300 自然科學', '(B) 100 哲學類'], ans: 0 },
+            { q: '想知道「太陽系有幾大行星」，要找哪一區的書？', opts: ['(A) 300 自然科學', '(B) 400 應用科學'], ans: 0 },
+            { q: '《台灣昆蟲圖鑑》會放在圖書館的哪一類？', opts: ['(A) 300 自然科學', '(B) 600 中國史地'], ans: 0 },
+          ],
+          '400': [
+            { q: '想學「怎麼做巧克力蛋糕」的食譜書在哪一區？', opts: ['(A) 400 應用科學', '(B) 900 藝術類'], ans: 0 },
+            { q: '介紹「汽車怎麼動起來」的科學書要找哪一類？', opts: ['(A) 400 應用科學', '(B) 300 自然科學'], ans: 0 },
+            { q: '介紹交通工具的書會放在哪個分類號？', opts: ['(A) 800 語文類', '(B) 400 應用科學'], ans: 1 },
+          ],
+          '500': [
+            { q: '介紹「警察與消防員」工作的書在哪一區？', opts: ['(A) 500 社會科學', '(B) 100 哲學類'], ans: 0 },
+            { q: '想知道「端午節和中秋節」的由來，要找哪一類？', opts: ['(A) 500 社會科學', '(B) 800 語文類'], ans: 0 },
+            { q: '教大家「過馬路要看紅綠燈」的書放在哪裡？', opts: ['(A) 000 總類', '(B) 500 社會科學'], ans: 1 },
+          ],
+          '600': [
+            { q: '《台灣歷史尋寶記》應該放在哪一區？', opts: ['(A) 600 中國史地', '(B) 200 宗教類'], ans: 0 },
+            { q: '想認識「萬里長城」的風景與歷史，要找哪一類？', opts: ['(A) 600 中國史地', '(B) 700 世界史地'], ans: 0 },
+            { q: '介紹「台北101與阿里山」的地理書在哪裡？', opts: ['(A) 600 中國史地', '(B) 300 自然科學'], ans: 0 },
+          ],
+          '700': [
+            { q: '想看「埃及金字塔」的歷史書，應該找哪一區？', opts: ['(A) 700 世界史地', '(B) 600 中國史地'], ans: 0 },
+            { q: '《美國尋寶記》這本介紹國外風俗的書在哪一類？', opts: ['(A) 700 世界史地', '(B) 500 社會科學'], ans: 0 },
+            { q: '想看詳細的「世界地圖」，要去找哪一區？', opts: ['(A) 700 世界史地', '(B) 000 總類'], ans: 0 },
+          ],
+          '800': [
+            { q: '《白雪公主》和《小紅帽》的童話書放在哪一區？', opts: ['(A) 300 自然科學', '(B) 800 語文類'], ans: 1 },
+            { q: '李白的《唐詩三百首》會放在圖書館的哪裡？', opts: ['(A) 800 語文類', '(B) 900 藝術類'], ans: 0 },
+            { q: '教我們「成語故事」的書在哪一類？', opts: ['(A) 800 語文類', '(B) 100 哲學類'], ans: 0 },
+          ],
+          '900': [
+            { q: '想學「怎麼畫水彩畫」要找哪一區？', opts: ['(A) 400 應用科學', '(B) 900 藝術類'], ans: 1 },
+            { q: '介紹「貝多芬與莫札特」的音樂書在哪裡？', opts: ['(A) 900 藝術類', '(B) 800 語文類'], ans: 0 },
+            { q: '怎麼玩桌遊的書放在哪一類？', opts: ['(A) 500 社會科學', '(B) 900 藝術類'], ans: 1 },
+          ]
+        };
+
+        const BOARD_SPACES = [
+          { id: 0, type: 'start', label: '起點' },
+          { id: 1, type: 'badge', cat: '000', label: '000 總類' },
+          { id: 2, type: 'helper', label: '小幫手' },
+          { id: 3, type: 'badge', cat: '100', label: '100 哲學' },
+          { id: 4, type: 'challenge', label: '挑戰格' },
+          { id: 5, type: 'badge', cat: '200', label: '200 宗教' },
+          { id: 6, type: 'confused', label: '小迷糊' },
+          { id: 7, type: 'badge', cat: '300', label: '300 自然' },
+          { id: 8, type: 'helper', label: '小幫手' },
+          { id: 9, type: 'badge', cat: '400', label: '400 應用' },
+          { id: 10, type: 'challenge', label: '挑戰格' },
+          { id: 11, type: 'badge', cat: '500', label: '500 社會' },
+          { id: 12, type: 'confused', label: '小迷糊' },
+          { id: 13, type: 'badge', cat: '600', label: '600 中國' },
+          { id: 14, type: 'helper', label: '小幫手' },
+          { id: 15, type: 'badge', cat: '700', label: '700 世界' },
+          { id: 16, type: 'challenge', label: '挑戰格' },
+          { id: 17, type: 'badge', cat: '800', label: '800 語文' },
+          { id: 18, type: 'confused', label: '小迷糊' },
+          { id: 19, type: 'badge', cat: '900', label: '900 藝術' }
+        ];
+
+        const HELPERS = [
+          { text: '你幫忙把童話故事放回 800 語文類，圖書館長獎勵你前進 3 步！', move: 3 },
+          { text: '你發現掉在地上的字典，把它放回 000 總類，前進 2 步！', move: 2 },
+          { text: '你教同學用圖書館電腦找書，熱心助人前進 1 步！', move: 1 }
+        ];
+
+        const CONFUSED = [
+          { text: '糟糕！你想借的恐龍書不在 900 藝術類，請退回 300 自然區尋找！(退後 3 步)', move: -3 },
+          { text: '小迷糊在圖書館奔跑被志工阿姨提醒，退後 2 步。', move: -2 },
+          { text: '忘記帶借書證了，回家拿！退後 1 步。', move: -1 }
+        ];
+
+        const getSpaceCoord = (index) => {
+          if (index <= 6) return { x: index, y: 0 };
+          if (index >= 7 && index <= 9) return { x: 6, y: index - 6 };
+          if (index >= 10 && index <= 16) return { x: 16 - index, y: 4 };
+          if (index >= 17 && index <= 19) return { x: 0, y: 20 - index };
+          return { x: 0, y: 0 };
+        };
+
+        function App() {
+          const [gameState, setGameState] = useState('start');
+          const [players, setPlayers] = useState([]);
+          const [turn, setTurn] = useState(0);
+          const [diceVal, setDiceVal] = useState(1);
+          const [isRolling, setIsRolling] = useState(false);
+          const [modal, setModal] = useState(null);
+          const [winnerIdx, setWinnerIdx] = useState(null);
+          
+          // [核心修復] 新增 isActionBusy 安全鎖，保護回合不被插隊
+          const [isActionBusy, setIsActionBusy] = useState(false);
+
+          const WINNING_SCORE = 100;
+          
+          const playersRef = useRef(players);
+          const questionsThisTurn = useRef(0);
+
+          useEffect(() => {
+            playersRef.current = players;
+          }, [players]);
+
+          // 電腦自動回合邏輯：只有在所有動作都結束且解鎖後，才會執行
+          useEffect(() => {
+            if (gameState === 'playing' && players[turn]?.isBot && !modal && !isRolling && !isActionBusy) {
+                const timer = setTimeout(() => { rollDice(); }, 1200);
+                return () => clearTimeout(timer);
+            }
+          }, [turn, gameState, modal, isRolling, isActionBusy, players]);
+
+          // 開始選擇角色
+          const handleSelectCharacter = (icon, name, colorTheme) => {
+              setPlayers([
+                  { id: 0, name: name, icon: icon, pos: 0, score: 0, badges: [], color: colorTheme.bg, text: colorTheme.text, isBot: false },
+                  { id: 1, name: '電腦', icon: '🤖', pos: 0, score: 0, badges: [], color: 'bg-slate-400 border-slate-500', text: 'text-slate-500', isBot: true }
+              ]);
+              setTurn(0);
+              setIsActionBusy(false);
+              setGameState('playing');
+          };
+
+          const rollDice = () => {
+            if (modal || gameState !== 'playing' || isRolling || isActionBusy) return;
+            setIsRolling(true);
+            setIsActionBusy(true); // 擲骰子時立刻上鎖
+            questionsThisTurn.current = 0; 
+
+            let ticks = 0;
+            const rollInterval = setInterval(() => {
+              setDiceVal(Math.floor(Math.random() * 6) + 1);
+              ticks++;
+              if (ticks > 10) {
+                clearInterval(rollInterval);
+                const finalVal = Math.floor(Math.random() * 6) + 1;
+                setDiceVal(finalVal);
+                setIsRolling(false);
+                setTimeout(() => movePlayer(turn, finalVal), 600);
+              }
+            }, 80);
+          };
+
+          const movePlayer = (playerIdx, steps) => {
+            // [核心修復] 直接算出正確位置，避免在 setState 中計算導致非同步 Bug
+            const currentPlayer = playersRef.current[playerIdx];
+            let newPos = currentPlayer.pos + steps;
+            
+            if (newPos >= 20) newPos %= 20;
+            if (newPos < 0) newPos += 20;
+
+            setPlayers(prev => {
+              const newPlayers = prev.map(p => ({...p}));
+              newPlayers[playerIdx].pos = newPos;
+              return newPlayers;
+            });
+
+            setTimeout(() => {
+              handleSpaceAction(playerIdx, newPos);
+            }, 600);
+          };
+
+          const handleSpaceAction = (playerIdx, currentPos) => {
+            const player = playersRef.current[playerIdx]; 
+            const space = BOARD_SPACES[currentPos];
+
+            if (space.type === 'start') {
+              nextTurn();
+            } 
+            else if (space.type === 'badge' || space.type === 'challenge') {
+              if (questionsThisTurn.current >= 1) {
+                  setModal({
+                      title: '休息一下', type: 'info', icon: '☕',
+                      text: player.isBot ? '電腦這回合已經答過題目囉！\n換你來挑戰！' : '你這回合已經答過題目囉！\n把機會讓給對手吧！',
+                      onResolve: () => nextTurn()
+                  });
+                  return;
+              }
+
+              questionsThisTurn.current += 1;
+              const allCats = Object.keys(CATEGORY_QUESTIONS);
+              const targetCat = space.type === 'badge' ? space.cat : allCats[Math.floor(Math.random() * allCats.length)];
+              const catQs = CATEGORY_QUESTIONS[targetCat];
+              const q = catQs[Math.floor(Math.random() * catQs.length)];
+
+              if (player.isBot) {
+                  const isCorrect = Math.random() < 0.7;
+                  const chosenAnsIdx = isCorrect ? q.ans : (1 - q.ans);
+                  
+                  setModal({
+                      title: `電腦挑戰【${space.label || '綜合題'}】`,
+                      type: 'info',
+                      playerIcon: '🤖',
+                      playerName: '電腦',
+                      text: `題目：${q.q}\n\n電腦選擇了：${q.opts[chosenAnsIdx]}\n\n結果：${isCorrect ? '答對了！獲得 10 分！' : '答錯了！'}`,
+                      onResolve: () => {
+                          if (isCorrect) {
+                              addScore(playerIdx, 10, space.type === 'badge' ? space.cat : null, () => {
+                                  if (space.type === 'challenge') movePlayer(playerIdx, 2);
+                                  else nextTurn();
+                              });
+                          } else {
+                              nextTurn();
+                          }
+                      }
+                  });
+              } else {
+                  setModal({
+                    title: `挑戰【${space.label || '綜合題'}】`,
+                    type: 'question',
+                    icon: CAT_ICONS[targetCat],
+                    playerIcon: player.icon,
+                    playerName: player.name,
+                    text: q.q,
+                    options: q.opts,
+                    ans: q.ans,
+                    onResolve: (isCorrect) => {
+                       if (isCorrect) {
+                           setModal({
+                               title: '答對了！', type: 'badge_win', icon: '🏆',
+                               text: `恭喜獲得 10 分！${space.type==='badge' ? `\n記住口訣：\n「${MNEMONICS[targetCat]}」` : '\n並獎勵你前進 2 步！'}`,
+                               onResolve: () => {
+                                   addScore(playerIdx, 10, space.type === 'badge' ? targetCat : null, () => {
+                                       if(space.type === 'challenge') movePlayer(playerIdx, 2);
+                                       else nextTurn();
+                                   });
+                               }
+                           });
+                       } else {
+                           setModal({
+                               title: '答錯了', type: 'info', icon: '😢',
+                               text: `好可惜！沒有得分，下次再來！${space.type==='badge' ? `\n先偷看口訣：\n「${MNEMONICS[targetCat]}」` : ''}`,
+                               onResolve: () => nextTurn()
+                           });
+                       }
+                    }
+                  });
+              }
+            }
+            else if (space.type === 'helper') {
+              const card = HELPERS[Math.floor(Math.random() * HELPERS.length)];
+              setModal({
+                title: '圖書館小幫手', type: 'info', icon: '🌟', 
+                text: `${player.isBot ? '電腦' : '你'}${card.text.substring(1)}`,
+                onResolve: () => movePlayer(playerIdx, card.move)
+              });
+            }
+            else if (space.type === 'confused') {
+              const card = CONFUSED[Math.floor(Math.random() * CONFUSED.length)];
+              setModal({
+                title: '小迷糊找書', type: 'info', icon: '😵', 
+                text: `${player.isBot && card.text.includes('你') ? card.text.replace('你', '電腦') : card.text}`,
+                onResolve: () => movePlayer(playerIdx, card.move)
+              });
+            }
+          };
+
+          const addScore = (playerIdx, points, cat, callback) => {
+            // [核心修復] 分數計算也移到外部進行，保證判斷獲勝條件時絕對準確
+            const currentPlayer = playersRef.current[playerIdx];
+            const newScore = currentPlayer.score + points;
+            const hasWon = newScore >= WINNING_SCORE;
+
+            setPlayers(prev => {
+              const newP = prev.map(p => ({...p, badges: [...p.badges]}));
+              newP[playerIdx].score += points;
+              
+              if (cat && !newP[playerIdx].badges.includes(cat)) {
+                newP[playerIdx].badges.push(cat);
+              }
+              return newP;
+            });
+
+            if (hasWon) {
+              setGameState('over');
+              setWinnerIdx(playerIdx);
+              setModal(null);
+            } else {
+              if (callback) callback();
+            }
+          };
+
+          const nextTurn = () => {
+            questionsThisTurn.current = 0; 
+            setIsActionBusy(false); // 回合完全結束，終於解鎖
+            setModal(null);
+            setTurn(prev => (prev + 1) % players.length);
+          };
+
+          const renderDice = (val) => {
+            return (
+              <div className={`w-14 h-14 md:w-16 md:h-16 bg-white rounded-xl border-4 border-slate-200 shadow-inner grid relative ${isRolling ? 'animate-spin' : ''} transition-transform`}>
+                 {val === 1 && <div className="absolute inset-0 flex items-center justify-center"><div className="w-4 h-4 bg-red-500 rounded-full shadow-sm"></div></div>}
+                 {val === 2 && <div className="absolute inset-0 flex flex-col justify-between p-2"><div className="w-3 h-3 bg-slate-800 rounded-full self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full self-start"></div></div>}
+                 {val === 3 && <div className="absolute inset-0 flex flex-col justify-between p-2"><div className="w-3 h-3 bg-slate-800 rounded-full self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full self-center"></div><div className="w-3 h-3 bg-slate-800 rounded-full self-start"></div></div>}
+                 {val === 4 && <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 p-2 gap-1"><div className="w-3 h-3 bg-slate-800 rounded-full"></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end self-end"></div></div>}
+                 {val === 5 && <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 p-1.5"><div className="w-3 h-3 bg-slate-800 rounded-full"></div><div></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end"></div><div></div><div className="w-3 h-3 bg-slate-800 rounded-full self-center justify-self-center"></div><div></div><div className="w-3 h-3 bg-slate-800 rounded-full self-end"></div><div></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end self-end"></div></div>}
+                 {val === 6 && <div className="absolute inset-0 grid grid-cols-2 grid-rows-3 p-1.5 gap-x-3 gap-y-1"><div className="w-3 h-3 bg-slate-800 rounded-full"></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full"></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full self-end"></div><div className="w-3 h-3 bg-slate-800 rounded-full justify-self-end self-end"></div></div>}
+              </div>
+            );
+          };
+
+          const renderBoard = () => {
+            return (
+              <div className="relative bg-[#f0f9ff] rounded-3xl border-[6px] border-[#bae6fd] p-4 shadow-xl mb-4 w-full aspect-[4/3] md:aspect-[7/5] overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                  <BookIcon className="w-64 h-64 text-blue-500" />
+                </div>
+
+                {BOARD_SPACES.map((space, idx) => {
+                  const coord = getSpaceCoord(idx);
+                  let bgClass = 'bg-white border-slate-300 text-slate-700';
+                  let icon = CAT_ICONS[space.type] || '';
+                  
+                  if (space.type === 'badge') {
+                    bgClass = CAT_COLORS[space.cat];
+                    icon = CAT_ICONS[space.cat];
+                  } else if (space.type === 'helper') {
+                    bgClass = 'bg-yellow-50 border-yellow-300 text-yellow-700';
+                  } else if (space.type === 'confused') {
+                    bgClass = 'bg-red-50 border-red-300 text-red-700';
+                  } else if (space.type === 'challenge') {
+                    bgClass = 'bg-violet-50 border-violet-300 text-violet-700';
+                  } else if (space.type === 'start') {
+                    bgClass = 'bg-amber-100 border-amber-400 text-amber-800';
+                  }
+
+                  return (
+                    <div 
+                      key={idx}
+                      className={`absolute flex flex-col items-center justify-center border-4 border-b-[6px] rounded-2xl shadow-sm font-bold text-xs md:text-[13px] text-center transform hover:-translate-y-1 transition-transform ${bgClass}`}
+                      style={{
+                        width: '13%', height: '18%',
+                        left: `${coord.x * 14.5}%`,
+                        top: `${coord.y * 20.5}%`,
+                      }}
+                    >
+                      <span className="text-xl md:text-3xl mb-1 drop-shadow-sm">{icon}</span>
+                      <span className="leading-tight px-1">{space.label}</span>
+                    </div>
+                  );
+                })}
+
+                {players.map((p, pIdx) => {
+                  const coord = getSpaceCoord(p.pos);
+                  const isCurrent = turn === pIdx;
+                  const offsetX = pIdx === 0 ? -12 : 12;
+                  
+                  return (
+                    <div
+                      key={p.id}
+                      className={`absolute w-10 h-10 md:w-12 md:h-12 rounded-full border-[3px] shadow-lg flex items-center justify-center text-xl md:text-2xl transition-all duration-700 z-10 ${p.color} bg-white ${isCurrent ? 'animate-bounce scale-110 z-20' : ''}`}
+                      style={{
+                        left: `calc(${coord.x * 14.5}% + 6.5% + ${offsetX}px)`,
+                        top: `calc(${coord.y * 20.5}% + 9%)`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                    >
+                      {p.icon}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+
+          // 首頁
+          if (gameState === 'start') {
+            return (
+              <div className="min-h-screen bg-sky-100 flex flex-col items-center justify-center p-6 text-center">
+                <div className="text-8xl mb-6 animate-bounce">📚</div>
+                <h1 className="text-4xl md:text-5xl font-black text-sky-800 mb-4 tracking-wider drop-shadow-md">圖書館小勇士</h1>
+                <h2 className="text-2xl text-sky-600 mb-8 font-bold">🗺️ 100分大挑戰 (對戰電腦)</h2>
+                <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border-4 border-sky-200 max-w-md w-full mb-8 text-left">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">📖 遊戲規則：</h3>
+                  <ul className="space-y-3 text-slate-700 font-medium">
+                    <li className="flex gap-2"><span>🐶</span> 你將與強大的「電腦對手」輪流擲骰子。</li>
+                    <li className="flex gap-2"><span>🎓</span> 踩到分類區，答對問題即可獲得 <strong>10分</strong>。</li>
+                    <li className="flex gap-2"><span>☕</span> <strong className="text-blue-600">休息機制：</strong>為了公平，每回合最多只能回答 1 題。</li>
+                    <li className="flex gap-2 font-bold text-rose-500"><span>🏆</span> 誰先累積達到 {WINNING_SCORE} 分，就能贏得比賽！</li>
+                  </ul>
+                </div>
+                <button 
+                  onClick={() => setGameState('select')}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white border-b-4 border-emerald-700 text-2xl font-bold py-4 px-12 rounded-full shadow-lg transform hover:scale-105 active:translate-y-1 active:border-b-0 transition-all"
+                >
+                  開始挑戰！
+                </button>
+              </div>
+            );
+          }
+
+          // 角色選擇畫面
+          if (gameState === 'select') {
+            return (
+              <div className="min-h-screen bg-sky-100 flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+                <h2 className="text-4xl md:text-5xl font-black text-sky-800 mb-8 drop-shadow-md">請選擇你的小勇士</h2>
+                <div className="flex flex-col md:flex-row gap-6">
+                    {/* 小狗 */}
+                    <button onClick={() => handleSelectCharacter('🐶', '小狗', {bg: 'bg-red-400 border-red-500', text: 'text-red-500'})} 
+                            className="bg-white p-8 rounded-3xl border-8 border-red-200 hover:border-red-400 hover:scale-105 transition-all shadow-xl group">
+                        <div className="text-8xl mb-4 group-hover:animate-bounce">🐶</div>
+                        <div className="text-2xl font-black text-red-500">小狗</div>
+                    </button>
+                    {/* 小兔 */}
+                    <button onClick={() => handleSelectCharacter('🐰', '小兔', {bg: 'bg-blue-400 border-blue-500', text: 'text-blue-500'})} 
+                            className="bg-white p-8 rounded-3xl border-8 border-blue-200 hover:border-blue-400 hover:scale-105 transition-all shadow-xl group">
+                        <div className="text-8xl mb-4 group-hover:animate-bounce">🐰</div>
+                        <div className="text-2xl font-black text-blue-500">小兔</div>
+                    </button>
+                    {/* 小魚 */}
+                    <button onClick={() => handleSelectCharacter('🐟', '小魚', {bg: 'bg-teal-400 border-teal-500', text: 'text-teal-500'})} 
+                            className="bg-white p-8 rounded-3xl border-8 border-teal-200 hover:border-teal-400 hover:scale-105 transition-all shadow-xl group">
+                        <div className="text-8xl mb-4 group-hover:animate-bounce">🐟</div>
+                        <div className="text-2xl font-black text-teal-500">小魚</div>
+                    </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
+              <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
+                
+                {/* 遊戲區 */}
+                <div className="flex-1 flex flex-col">
+                  {renderBoard()}
+                  
+                  <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-200 flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className={`px-4 py-2 md:py-3 rounded-2xl text-white font-bold flex items-center gap-2 text-sm md:text-base border-b-4 ${players[turn]?.color}`}>
+                        <span className="text-xl md:text-2xl bg-white rounded-full p-1 shadow-sm">{players[turn]?.icon}</span>
+                        輪到 {players[turn]?.name} 了
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 md:gap-6">
+                      {renderDice(diceVal)}
+                      <button
+                        onClick={rollDice}
+                        disabled={modal !== null || gameState === 'over' || isRolling || players[turn]?.isBot || isActionBusy}
+                        className="relative group disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <div className={`absolute inset-0 bg-sky-600 rounded-2xl transform ${(modal || isRolling || players[turn]?.isBot || isActionBusy) ? '' : 'translate-y-1.5 group-active:translate-y-0'} transition-transform`}></div>
+                        <div className={`relative bg-sky-400 text-white font-bold text-lg md:text-xl py-3 px-6 md:px-8 border-2 border-sky-300 rounded-2xl shadow-sm flex items-center gap-2 transform ${(modal || isRolling || players[turn]?.isBot || isActionBusy) ? '' : '-translate-y-1.5 group-active:translate-y-0'} transition-transform`}>
+                          <Dices className="w-6 h-6" /> {players[turn]?.isBot ? '電腦思考中' : '擲骰子'}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 記分板 */}
+                <div className="lg:w-80 flex flex-col gap-4">
+                  <div className="bg-amber-100 text-amber-900 font-bold p-4 rounded-3xl shadow-sm text-center text-lg border-[3px] border-amber-300 flex items-center justify-center gap-2">
+                    <Star className="text-amber-500 w-6 h-6 fill-current" />
+                    目標：獲得 {WINNING_SCORE} 分
+                  </div>
+                  
+                  {players.map((p, idx) => {
+                    const isTurn = turn === idx;
+                    return (
+                      <div key={p.id} className={`bg-white rounded-3xl p-5 border-4 transition-all ${isTurn ? 'border-amber-400 shadow-md transform scale-105' : 'border-slate-100 shadow-sm opacity-80'}`}>
+                        <div className="flex items-center justify-between mb-3 border-b-2 border-slate-50 pb-2">
+                          <span className={`font-black text-xl flex items-center gap-2 ${p.text}`}>
+                            <span className="text-2xl">{p.icon}</span> {p.name}
+                          </span>
+                          <span className={`px-3 py-1 rounded-full text-lg font-black border-2 ${isTurn ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                            {p.score} 分
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 font-bold mb-1">已探索的分類圖示：</div>
+                        <div className="flex flex-wrap gap-2 min-h-[2rem]">
+                          {p.badges.length === 0 && <span className="text-slate-400 text-xs font-medium">尚未獲得...</span>}
+                          {p.badges.map(b => (
+                            <div key={b} className="flex items-center gap-1 bg-sky-50 text-sky-700 text-sm font-bold px-2 py-1 rounded-lg border border-sky-200 shadow-sm">
+                              <span>{CAT_ICONS[b]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 彈出視窗 */}
+              {modal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-[2rem] border-8 border-sky-100 p-6 md:p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300 text-center relative">
+                    
+                    {modal.type !== 'question' && (
+                      <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-7xl drop-shadow-lg">
+                        {modal.icon}
+                      </div>
+                    )}
+                    
+                    {(modal.type === 'question' || modal.playerName === '電腦') && modal.playerIcon && (
+                      <div className="flex justify-center items-center gap-3 mb-2 mt-2 bg-sky-50 py-2 px-6 rounded-2xl border-4 border-sky-100 inline-flex mx-auto">
+                        <span className="text-4xl drop-shadow-sm">{modal.playerIcon}</span>
+                        <span className="text-xl font-black text-sky-800">{modal.playerName} {modal.playerName === '電腦' ? '正在行動' : '的題目'}</span>
+                      </div>
+                    )}
+                    
+                    <h2 className={`text-2xl md:text-3xl font-black mb-4 text-slate-800 whitespace-pre-line ${modal.type !== 'question' ? 'mt-8' : 'mt-2'}`}>
+                      {modal.title}
+                    </h2>
+
+                    <p className={`text-lg text-slate-700 whitespace-pre-line mb-6 font-bold leading-relaxed ${modal.type === 'question' ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100'} p-4 rounded-2xl border-2`}>
+                      {modal.text}
+                    </p>
+
+                    {modal.type === 'question' ? (
+                      <div className="flex flex-col gap-3">
+                        {modal.options.map((opt, idx) => (
+                          <button 
+                            key={idx}
+                            onClick={() => {
+                                // [核心修復] 防止小朋友連續快速點擊導致狀態錯亂
+                                const resolveFn = modal.onResolve;
+                                setModal(null);
+                                resolveFn(idx === modal.ans);
+                            }}
+                            className="bg-white hover:bg-sky-50 text-sky-800 font-bold py-4 px-6 rounded-2xl text-left transition-all border-4 border-sky-100 hover:border-sky-300 hover:shadow-md transform hover:-translate-y-1"
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                            const resolveFn = modal.onResolve;
+                            setModal(null);
+                            resolveFn();
+                        }}
+                        className="bg-emerald-400 hover:bg-emerald-500 text-white font-black py-4 px-8 rounded-full shadow-lg w-full text-xl border-b-4 border-emerald-600 active:translate-y-1 active:border-b-0 transition-all"
+                      >
+                        確定
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 遊戲結束視窗 (大型記分板) */}
+              {gameState === 'over' && (
+                <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-[2.5rem] border-8 border-amber-300 p-8 max-w-2xl w-full shadow-2xl text-center relative overflow-hidden animate-in fade-in zoom-in duration-500">
+                    <div className="absolute top-0 left-0 w-full h-32 bg-amber-100 -z-10 rounded-t-2xl"></div>
+                    
+                    <div className="text-8xl mb-2 animate-bounce mt-4">🏆</div>
+                    <h2 className="text-5xl font-black text-rose-600 mb-2 drop-shadow-sm">遊戲結束！</h2>
+                    <div className="text-2xl font-bold text-slate-700 mb-8">
+                      {players[winnerIdx].isBot ? '糟糕！' : '恭喜！'} <span className="text-3xl mx-2">{players[winnerIdx].icon}</span> 
+                      <span className="text-amber-600 font-black">{players[winnerIdx].name}</span> 率先達成 {WINNING_SCORE} 分！
+                    </div>
+
+                    <div className="bg-slate-50 p-6 rounded-3xl border-4 border-emerald-400 mb-8 relative shadow-inner">
+                      <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 bg-emerald-500 text-white px-6 py-2 rounded-full font-black text-xl shadow-md tracking-widest flex items-center gap-2">
+                        📋 最終成績
+                      </div>
+                      
+                      <div className="flex justify-around items-center mt-6">
+                        <div className="text-center w-[45%]">
+                          <div className="text-6xl mb-2 drop-shadow-sm">{players[0].icon}</div>
+                          <div className="text-2xl font-bold text-slate-600 mb-2">{players[0].name}</div>
+                          <div className={`bg-white rounded-2xl py-4 border-2 border-slate-200 shadow-sm ${winnerIdx===0 ? 'ring-4 ring-amber-400' : ''}`}>
+                            <span className="text-6xl font-black" style={{color: players[0].color.includes('red') ? '#ef4444' : players[0].color.includes('blue') ? '#3b82f6' : '#14b8a6'}}>{players[0].score}</span>
+                            <span className="text-2xl text-slate-500 font-bold ml-2">分</span>
+                          </div>
+                        </div>
+
+                        <div className="text-4xl font-black text-slate-300">VS</div>
+
+                        <div className="text-center w-[45%]">
+                          <div className="text-6xl mb-2 drop-shadow-sm">{players[1].icon}</div>
+                          <div className="text-2xl font-bold text-slate-600 mb-2">{players[1].name}</div>
+                          <div className={`bg-white rounded-2xl py-4 border-2 border-slate-200 shadow-sm ${winnerIdx===1 ? 'ring-4 ring-amber-400' : ''}`}>
+                            <span className="text-6xl font-black text-slate-500">{players[1].score}</span>
+                            <span className="text-2xl text-slate-500 font-bold ml-2">分</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="bg-amber-400 hover:bg-amber-500 text-amber-900 font-black py-4 px-12 rounded-full shadow-lg text-2xl border-b-4 border-amber-600 active:translate-y-1 active:border-b-0 transition-all inline-flex items-center gap-2"
+                    >
+                      🔄 再玩一次！
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
